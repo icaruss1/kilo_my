@@ -56,7 +56,7 @@ impl Editor {
     }
 
     fn draw_rows(&mut self) {
-        for _y in 0..self.cfg.size.1 + 1 {
+        for _y in 0..self.cfg.size.1 - 1 {
             print!("~\r\n");
         }
     }
