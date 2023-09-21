@@ -1,9 +1,11 @@
 use crate::terminal::EConfig;
 
+use std::fmt;
 use std::io::Write; // for flush() in clearing screen
 use std::io::{self, stdout};
 use std::process::exit; // for clearer program exit
-
+                        //
+use termion::cursor;
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
@@ -11,6 +13,27 @@ use termion::raw::IntoRawMode;
 pub struct Editor {
     should_quit: bool,
     cfg: EConfig,
+    screen_state: Vec<u8>, // the String for screen_state, for a refreshed screen and basic drawing. Write all formatting
+                           // strings
+                           //cursor_pos: cursor::Goto,
+}
+
+struct ABuf {
+    buf: Vec<u8>,
+    len: u16,
+}
+
+impl ABuf {
+    fn append(self, s: &str) {
+        let bytes = s.as_bytes();
+
+        for b in bytes {
+            self.buf.clone().push(*b);
+        }
+    }
+    //fn state_append(mut ptr: *mut [u8], s: &str) {
+    //let bytes = s.as_bytes();
+    //}
 }
 
 impl Editor {
@@ -49,21 +72,26 @@ impl Editor {
 
     pub fn default() -> Self {
         let cnfg = EConfig::default().unwrap();
+        // ptr to buffer for screen_state str
+
         Self {
             should_quit: false,
             cfg: cnfg,
+            screen_state: Vec::new(),
         }
     }
 
     fn draw_rows(&mut self) {
         for _y in 0..self.cfg.size.1 - 1 {
-            print!("~\r\n");
+            self.screen_state.append(&mut "~\r\n".as_bytes().to_vec());
         }
     }
 
     fn refresh_screen(&mut self) -> Result<(), std::io::Error> {
+        // clear the cursr
         print!("{}[2J", 27 as char); //27 as char is escape character
-        print!("\x1b[H"); // \x1 is binary escape char; set cursor to top left of the screen
+                                     //print!("\x1b[H"); // \x1 is binary escape char; set cursor to top left of the screen
+        print!("\x1b[H");
         if !self.should_quit {
             self.draw_rows();
         }
@@ -77,7 +105,6 @@ impl Editor {
         io::stdout().flush()
     }
 }
-
 fn read_key() -> Result<Key, std::io::Error> {
     loop {
         // locks handle to standard input stream, allowing us to read from it, returns error
