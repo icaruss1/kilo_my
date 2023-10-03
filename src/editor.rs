@@ -1,6 +1,7 @@
 use crate::document::Document;
 use crate::terminal::Terminal;
 
+use std::env;
 use std::io::{Error, ErrorKind};
 use std::process::exit; // for clearer program exit
 
@@ -19,13 +20,18 @@ pub struct Editor {
 
 impl Editor {
     pub fn run(&mut self) {
+        if env::args().len() > 1 {
+            let args: Vec<String> = env::args().collect();
+
+            let filename = &args[1];
+            if let Err(err) = self.document.open_file(filename) {
+                die(err)
+            }
+        }
         loop {
             // Handling errors in process keypress
             // if let = matches only condition
             // if there is error in processing keypress then die else continue processing
-            if let Err(err) = self.document.open_file("hi") {
-                die(err);
-            }
             if let Err(err) = self.refresh_screen() {
                 die(err);
             }
@@ -80,6 +86,7 @@ impl Editor {
     fn draw_rows(&mut self) -> Result<(), Error> {
         for y in 0..self.terminal.size().1 - 1 {
             self.terminal.push_screen_state("\x1b[K")?; // clear row to right of cursor
+                                                        //let no_rows_string = format!("no of rows are {:?}", self.document.number_rows()?);
             if y >= self.document.number_rows()? {
                 if y == self.terminal.size().1 / 3 {
                     // 1/3 down the screen, print the welcome message
@@ -94,6 +101,7 @@ impl Editor {
                         self.terminal.push_screen_state(" ")?;
                     }
                     self.terminal.push_screen_state(&ver_string)?;
+                    //self.terminal.push_screen_state(&no_rows_string)?;
                 } else {
                     self.terminal.push_screen_state("~\r\n")?; // print tilda and return newline
                 }
@@ -157,6 +165,7 @@ impl Editor {
     fn refresh_screen(&mut self) -> Result<(), Error> {
         self.terminal.push_screen_state("\x1b[?25l")?; // turn off cursor
         self.terminal.push_screen_state("\x1b[H")?; // set cursor to top left of the screen
+                                                    // clear line to the left of the cursor
 
         self.draw_rows()?;
 

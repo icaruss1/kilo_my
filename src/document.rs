@@ -1,3 +1,4 @@
+use std::fs::read_to_string;
 use std::io::{Error, ErrorKind};
 
 struct Row {
@@ -11,14 +12,14 @@ pub struct Document {
 
 impl Document {
     //open file s
-    pub fn open_file(&mut self, _s: &str) -> Result<(), Error> {
-        let s = "hello world\n\r".to_string();
-        let s1 = "how are you\n\r".to_string();
-        let r1 = Row { text: s };
-        let r2 = Row { text: s1 };
+    pub fn open_file(&mut self, s: &str) -> Result<(), Error> {
+        let rows: Vec<Row> = read_to_string(s)?
+            .lines()
+            .map(String::from)
+            .map(|s| Row { text: s })
+            .collect();
 
-        self.rows.push(r1);
-        self.rows.push(r2);
+        self.rows = rows;
         Ok(())
     }
 
@@ -26,12 +27,19 @@ impl Document {
         let mut text_string = String::new();
         for row in &self.rows {
             let text = row.text.clone();
-            text_string.push_str(&text);
+            let format_sring = format!("{}\r\n", text);
+            text_string.push_str(&format_sring);
         }
         Ok(text_string)
     }
 
     pub fn number_rows(&self) -> Result<usize, Error> {
         Ok(self.rows.len())
+    }
+
+    pub fn close_document(&mut self) -> Result<(), Error> {
+        let rows = Vec::new();
+        self.rows = rows;
+        Ok(())
     }
 }

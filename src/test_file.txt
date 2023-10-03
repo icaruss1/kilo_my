@@ -1,0 +1,3 @@
+this file has 3 lines
+i hope they are all printed
+correctly hehe 
