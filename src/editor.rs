@@ -11,9 +11,10 @@ const E_VERSION: &str = "0.0.1";
 
 // move the screen state to the terminal
 pub struct Editor {
-    should_quit: bool,
+    should_quit: bool,          // for exiting the program with ctrl+q
     terminal: Terminal,         // Terminal
     cursor_pos: (usize, usize), //  pos in document, needs to be larger than u16
+    row_off: usize,             //row offset for scrolling
     mode: u16,                  // 0 for e, 1 for input
     document: Document,
 }
@@ -78,38 +79,62 @@ impl Editor {
             should_quit: false,
             terminal: cnfg,
             cursor_pos: (1, 1),
+            row_off: 0,
             mode: 0,
             document: Document::default(),
         }
     }
 
+    fn draw_welcome(&mut self) -> Result<(), Error> {
+        // 1/3 down the screen, print the welcome message
+        //let no_rows_string = format!("no of rows are {:?}", self.document.number_rows()?);
+        let ver_string = format!("{} {}\r\n", "Kilo editor -- version", E_VERSION);
+        // padding for printing the welcome msg in the middle of the screen
+        let mut padding = (self.terminal.size().0 as usize - ver_string.len()) / 2;
+        if padding > 0 {
+            self.terminal.push_screen_state("~")?;
+            padding -= 1;
+        }
+        for _ in 0..padding {
+            self.terminal.push_screen_state(" ")?;
+        }
+        self.terminal.push_screen_state(&ver_string)?;
+        //self.terminal.push_screen_state(&no_rows_string)?;
+        Ok(())
+    }
+
     fn draw_rows(&mut self) -> Result<(), Error> {
+        // terminal.size().1 is height / no of cols
         for y in 0..self.terminal.size().1 - 1 {
             self.terminal.push_screen_state("\x1b[K")?; // clear row to right of cursor
-                                                        //let no_rows_string = format!("no of rows are {:?}", self.document.number_rows()?);
-            if y >= self.document.number_rows()? {
-                if y == self.terminal.size().1 / 3 {
-                    // 1/3 down the screen, print the welcome message
-                    let ver_string = format!("{} {}\r\n", "Kilo editor -- version", E_VERSION);
-                    // padding for printing the welcome msg in the middle of the screen
-                    let mut padding = (self.terminal.size().0 as usize - ver_string.len()) / 2;
-                    if padding > 0 {
-                        self.terminal.push_screen_state("~")?;
-                        padding -= 1;
-                    }
-                    for _ in 0..padding {
-                        self.terminal.push_screen_state(" ")?;
-                    }
-                    self.terminal.push_screen_state(&ver_string)?;
-                    //self.terminal.push_screen_state(&no_rows_string)?;
+            let filerow = y + self.row_off;
+            if filerow >= self.document.number_rows()? {
+                if y == self.terminal.size().1 / 3 && self.document.number_rows()? == 0 {
+                    self.draw_welcome()?;
                 } else {
                     self.terminal.push_screen_state("~\r\n")?; // print tilda and return newline
                 }
+                // IDK WHY READ_ROW(FILEROW) RENDERS THE ENTIRE SCREEN MOSTLY PERFECTLY
             } else {
                 self.terminal
-                    .push_screen_state(&self.document.read_rows()?)?;
+                    .push_screen_state(&self.document.read_row(filerow)?)?;
             }
         }
+        Ok(())
+    }
+
+    fn editor_scroll(&mut self) -> Result<(), Error> {
+        let cursor_cols = self.cursor_pos.0;
+        let screen_rows = self.terminal.size().1;
+
+        // if cursor is above visibile window, scrolls to wear the cursor is
+        if cursor_cols < self.row_off {
+            self.row_off = cursor_cols;
+        };
+
+        if cursor_cols >= self.row_off + screen_rows {
+            self.row_off = cursor_cols - screen_rows;
+        };
         Ok(())
     }
 
@@ -163,6 +188,8 @@ impl Editor {
 
     // using escape sequences (\x1b...), refresh the screen_state
     fn refresh_screen(&mut self) -> Result<(), Error> {
+        self.editor_scroll()?;
+
         self.terminal.push_screen_state("\x1b[?25l")?; // turn off cursor
         self.terminal.push_screen_state("\x1b[H")?; // set cursor to top left of the screen
                                                     // clear line to the left of the cursor
